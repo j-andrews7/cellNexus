@@ -253,8 +253,42 @@ create_interface_app <- function(metadata) {
 
     server <- function(input, output, session) {
 
+        # Observe the features input and update the features reactive value
+        features <- reactive({
+            # Parse the features input into a vector
+            .string_to_vector(input$features)
+        })
+
+        # Observe the retrieval type input and update the retrieval type reactive value
+        retrieval_condition <- reactive({
+            if (input$retrieval_type == "SingleCellExperiment") {
+                paste0("get_single_cell_experiment(",
+                    if (length(features()) > 1 || all(features() != "")) {
+                        paste0("features = c(", paste0(shQuote(features()), collapse = ", "), "),")
+                    },
+                    "assays = ", shQuote(input$assay), ")")
+            } else if (input$retrieval_type == "pseudobulk") {
+                paste0("get_pseudobulk(",
+                    if (length(features()) > 1 || all(features() != "")) {
+                        paste0("features = c(", paste0(shQuote(features()), collapse = ", "), "),")
+                    },
+                    "assays = ", shQuote(input$assay), ")")
+            } else if (input$retrieval_type == "Seurat") {
+                paste0("get_seurat(",
+                    if (length(features()) > 1 || all(features() != "")) {
+                        paste0("features = c(", paste0(shQuote(features()), collapse = ", "), "),")
+                    },
+                    "assays = ", shQuote(input$assay), ")")
+            } else if (input$retrieval_type == "metacell") {
+                paste0("get_metacell(",
+                    if (length(features()) > 1 || all(features() != "")) {
+                        paste0("features = c(", paste0(shQuote(features()), collapse = ", "), "),")
+                    },
+                    "assays = ", shQuote(input$assay), ", cell_aggregation = ", shQuote(input$metacell_aggregation), ")")
+            }
+        })
+
         output$code_box <- renderPrint({
-            browser()
             filter_conditions <- list()
 
             for (col in colnames(cell_cols)) {
@@ -275,15 +309,11 @@ create_interface_app <- function(metadata) {
                 }
             }
 
-            code_lines <- c(
-                "library(cellNexus)",
-                "",
-                "get_metadata() %>%",
+            code_lines <- c("get_metadata() %>%",
                 if (length(filter_conditions) > 0) {
-                    paste0("  filter(", paste(filter_conditions, collapse = ",\n         "), ")")
-                } else {
-                    "# No filters applied"
-                }
+                    paste0("  dplyr::filter(", paste(filter_conditions, collapse = ",\n         "), ")")
+                },
+                retrieval_condition()
             )
 
             cat(paste(code_lines, collapse = "\n"))
