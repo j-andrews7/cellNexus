@@ -135,8 +135,8 @@ organize_inputs <- function(
 #' @return A Shiny app that allows users to filter cellNexus metadata and generate code for retrieval
 #'   in the selected format.
 #'
-#' @importFrom shiny fluidPage sidebarLayout sidebarPanel mainPanel titlePanel
-#'   verbatimTextOutput renderPrint shinyApp h3 tagList reactiveValuesToList reactiveValues
+#' @importFrom shiny fluidPage sidebarLayout sidebarPanel mainPanel titlePanel textAreaInput
+#'   verbatimTextOutput renderPrint shinyApp h3 tagList reactiveValues selectInput hr
 #' @importFrom shinyWidgets pickerInput pickerOptions
 #' @importFrom dplyr filter distinct
 #'
@@ -153,6 +153,13 @@ create_interface_app <- function(metadata) {
         "azimuth_predicted_celltype_l2_1", "is_immune", "empty_droplet"
     )
 
+    # Make named list of options for each column in metadata
+    cell_choices <- lapply(cell_cols, function(col) {
+        as.data.frame(dplyr::distinct(metadata, !!rlang::sym(col)))[[col]]
+    })
+
+    names(cell_choices) <- cell_cols
+
     sample_cols <- c(
         "development_stage",
         "disease",
@@ -163,10 +170,17 @@ create_interface_app <- function(metadata) {
         "tissue_groups"
     )
 
+    # Make named list of options for each column in metadata
+    sample_choices <- lapply(sample_cols, function(col) {
+        as.data.frame(dplyr::distinct(metadata, !!rlang::sym(col)))[[col]]
+    })
+
+    names(sample_choices) <- sample_cols
+
     cell_inputs <- lapply(cell_cols, function(col) {
-        choices <- as.data.frame(dplyr::distinct(metadata, !!rlang::sym(col)))[[col]]
+        choices <- cell_choices[[col]]
         pickerInput(
-            inputId = paste0("filter_", col),
+            inputId = col,
             label = col,
             choices = choices,
             multiple = TRUE,
@@ -181,9 +195,9 @@ create_interface_app <- function(metadata) {
     })
 
     sample_inputs <- lapply(sample_cols, function(col) {
-        choices <- as.data.frame(dplyr::distinct(metadata, !!rlang::sym(col)))[[col]]
+        choices <- sample_choices[[col]]
         pickerInput(
-            inputId = paste0("filter_", col),
+            inputId = col,
             label = col,
             choices = choices,
             multiple = TRUE,
@@ -235,14 +249,11 @@ create_interface_app <- function(metadata) {
         titlePanel("cellNexus Data Selection"),
         sidebarLayout(
             sidebarPanel(width = 5,
-                h3("Cell Type"),
-                organize_inputs(cell_inputs, columns = 2),
+                organize_inputs(cell_inputs, columns = 2, title = h3("Cell Type")),
                 hr(),
-                h3("Sample"),
-                organize_inputs(sample_inputs, columns = 3),
+                organize_inputs(sample_inputs, columns = 3, title = h3("Sample")),
                 hr(),
-                h3("Retrieval Options"),
-                organize_inputs(retrieval_inputs, columns = 2),
+                organize_inputs(retrieval_inputs, columns = 2, title = h3("Retrieval Options")),
             ),
             mainPanel(width = 7,
                 h3("Generated Code"),
@@ -257,6 +268,27 @@ create_interface_app <- function(metadata) {
         features <- reactive({
             # Parse the features input into a vector
             .string_to_vector(input$features)
+        })
+
+        # Collect inputs as data.frame with each row as input_id and filter
+        # Only include inputs that are not NULL, "", or with all values selected
+        input_filters <- reactive({
+            input_list <- list()
+            df_row <- NULL
+            all_cols <- c(cell_cols, sample_cols)
+            all_choices <- c(cell_choices, sample_choices)
+            for(i in c(all_cols)) {
+                curr_input <- input[[i]]
+                # Check if the input is NULL or empty
+                is_def_choices <- length(curr_input) == length(all_choices[[i]])
+                if (length(curr_input) == 0 || all(curr_input == "") || is_def_choices) {
+                    next
+                }
+
+                input_list[[i]] <- curr_input
+            }
+
+            input_list
         })
 
         # Observe the retrieval type input and update the retrieval type reactive value
@@ -291,27 +323,21 @@ create_interface_app <- function(metadata) {
         output$code_box <- renderPrint({
             filter_conditions <- list()
 
-            for (col in colnames(cell_cols)) {
-                sel <- input[[paste0("filter_", col)]]
-                # Only add filter condition if not all choices are selected
-                if (!is.null(sel) && length(sel) < length(as.data.frame(dplyr::distinct(metadata, !!rlang::sym(col)))[[col]])) {
-                    condition <- paste0(col, " %in% c(", paste(shQuote(sel), collapse = ", "), ")")
+            # Add filters to filter_conditions from input_filters()
+            input_list <- input_filters()
+            if (!is.null(input_list)) {
+                for (i in seq_along(input_list)) {
+                    input_id <- names(input_list)[i]
+                    input_val <- input_list[[i]]
+
+                    condition <- paste0(input_id, " %in% c(", paste(shQuote(input_val), collapse = ", "), ")")
                     filter_conditions <- c(filter_conditions, condition)
                 }
             }
 
-            for (col in colnames(sample_cols)) {
-                sel <- input[[paste0("filter_", col)]]
-                # Only add filter condition if not all choices are selected
-                if (!is.null(sel) && length(sel) < length(as.data.frame(dplyr::distinct(metadata, !!rlang::sym(col)))[[col]])) {
-                    condition <- paste0(col, " %in% c(", paste(shQuote(sel), collapse = ", "), ")")
-                    filter_conditions <- c(filter_conditions, condition)
-                }
-            }
-
-            code_lines <- c("get_metadata() %>%",
+            code_lines <- c("my_data <- get_metadata() |>",
                 if (length(filter_conditions) > 0) {
-                    paste0("  dplyr::filter(", paste(filter_conditions, collapse = ",\n         "), ")")
+                    paste0("  dplyr::filter(", paste(filter_conditions, collapse = ",\n         "), ") |>")
                 },
                 retrieval_condition()
             )
