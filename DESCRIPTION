@@ -99,9 +99,9 @@ Imports:
     tidySingleCellExperiment,
     tidybulk,
     shiny,
-    shinyWidgets
+    shinyWidgets,
+    zellkonverter
 Suggests:
-    zellkonverter,
     rmarkdown,
     knitr,
     testthat,
