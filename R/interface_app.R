@@ -349,5 +349,7 @@ create_interface_app <- function(metadata) {
         })
     }
 
-    shinyApp(ui, server)
+    # shinyApp(ui, server)
+    
+    return(list(ui = ui, server = server))
 }
