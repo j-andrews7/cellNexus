@@ -145,7 +145,7 @@ create_interface_app <- function(metadata) {
     # Generate dynamic pickerInputs for select columns in metadata
     cell_cols <- c(
         "cell_type_unified_ensemble",
-        "cell_type",
+        "cell_type_unified",
         "alive",
         "scDblFinder.class",
         "is_immune",
