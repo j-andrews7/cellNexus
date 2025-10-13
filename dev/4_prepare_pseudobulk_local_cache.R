@@ -25,8 +25,8 @@
 library(targets)
 library(tidyverse)
 library(cellNexus)
-store_file_cellNexus = "/vast/scratch/users/shen.m/targets_prepare_database_split_datasets_chunked_1_0_11_pseudobulk"
-my_store = "/vast/scratch/users/shen.m/Census_final_run/target_store_for_pseudobulk"
+store_file_cellNexus = "/vast/scratch/users/shen.m/targets_prepare_database_split_datasets_chunked_1_0_13_pseudobulk"
+my_store = "/vast/scratch/users/shen.m/cellNexus_target_store"
 
 tar_script({
   library(dplyr)
@@ -42,7 +42,7 @@ tar_script({
     storage = "worker", 
     retrieval = "worker", 
     error = "continue", 
-    cue = tar_cue(mode = "never"),
+    cue = tar_cue(mode = "thorough"),
     #debug = "dataset_id_sce", 
     
     workspace_on_error = TRUE,
@@ -291,11 +291,12 @@ insistent_save_anndata <- purrr::insistently(save_anndata, rate = purrr::rate_de
 list(
   
   # The input DO NOT DELETE
-  tar_target(my_store, "/vast/scratch/users/shen.m/Census_final_run/target_store_for_pseudobulk", deployment = "main"),
-  tar_target(cache_directory, "/vast/scratch/users/shen.m/cellNexus/cellxgene/01-05-2025/pseudobulk", deployment = "main"),
+  tar_target(my_store, "/vast/scratch/users/shen.m/cellNexus_target_store", deployment = "main"),
+  tar_target(cache_directory, "/vast/scratch/users/shen.m/cellNexus/cellxgene/21-08-2025/pseudobulk", deployment = "main"),
   tar_target(
     cell_metadata,
-    "/vast/scratch/users/shen.m/cellNexus_run/cell_metadata_cell_type_consensus_v1_0_11_mengyuan.parquet", 
+    #"/vast/scratch/users/shen.m/cellNexus_run/cell_metadata_cell_type_consensus_v1_0_12_mengyuan.parquet", 
+    "/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/cell_metadata_cell_type_consensus_v1_0_13_mengyuan.parquet", 
     packages = c( "arrow","dplyr","duckdb")
     
   ),

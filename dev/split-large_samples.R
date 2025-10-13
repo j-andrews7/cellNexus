@@ -25,26 +25,26 @@ sample_to_cell_primary <- sample_to_cell |> filter(is_primary_data == TRUE)
 sample_to_cell_primary <-  readRDS("~/scratch/Census/cellxgene_to_census/sample_to_cell_primary.rds")
 
 sample_to_cell_primary_human <- sample_to_cell_primary |> 
-  left_join(sample_meta, by = c("sample_id","dataset_id")) |> 
+  left_join(sample_meta, by = c("sample_","dataset_id")) |> 
   filter(organism == "Homo sapiens") |> 
-  select(observation_joinid, cell_id, sample_id, donor_id.x, dataset_id, is_primary_data.x, 
+  select(observation_joinid, cell_, sample_, donor_id.x, dataset_id, is_primary_data.x, 
          sample_heuristic.x, organism, tissue, development_stage, assay, collection_id,
          sex, self_reported_ethnicity, disease, cell_type)
-
+gc()
 # accepted_assays from census 
-accepted_assays <- read.csv("~/projects/cellNexus/cellxgene-to-census/census_accepted_assays.csv", header=TRUE)
+accepted_assays <- read.csv("~/projects/CuratedAtlasQueryR/cellxgene-to-census/census_accepted_assays.csv", header=TRUE)
 sample_to_cell_primary_human_accepted_assay <- sample_to_cell_primary_human |> filter(assay %in% accepted_assays$assay)
 
 large_samples <- sample_to_cell_primary_human_accepted_assay |> 
-  dplyr::count(sample_id, assay, collection_id, dataset_id) |> 
+  dplyr::count(sample_, assay, collection_id, dataset_id) |> 
   mutate(above_threshold = n > 15000)
 
 large_samples_collection_id <- large_samples |> ungroup() |> 
   dplyr::count(collection_id) |> arrange(desc(n))
 
-# function to discard nucleotide in cell_id ---------------------------------
+# function to discard nucleotide in cell_ ---------------------------------
 # cell pattern repeated across samples. 
-# Decision: use modified_cell and sample_id to split data
+# Decision: use modified_cell and sample_ to split data
 
 # drop cell ID if cell ID is a series of numbers
 # ACGT more than 5, drops
@@ -60,42 +60,45 @@ remove_nucleotides_and_separators <- function(x) {
   modified <- str_replace_all(modified, "[:_-]{2,}", "_")
 }
 
-# List of collection IDs for sample cells great than 10K
+# List of collection IDs
 collection_ids <- large_samples_collection_id$collection_id
 
+gc()
 process_collection <- function(id) {
   filtered_data <- sample_to_cell_primary_human_accepted_assay |>
     filter(collection_id == id) |>
-    select(cell_id, sample_id)
+    select(cell_, sample_)
   
-  filtered_data$cell_modified <- remove_nucleotides_and_separators(filtered_data$cell_id)
+  filtered_data$cell_modified <- remove_nucleotides_and_separators(filtered_data$cell_)
   filtered_data
 }
 
 final_result <- map_df(collection_ids, process_collection)
 
-# conditional generating sample_2 based on whether number of cells > 10K.
+# conditional generating sample_2 based on whether number of cells > 15K.
 sample_to_cell_primary_human_accepted_assay <- sample_to_cell_primary_human_accepted_assay |> 
-  left_join(large_samples, by = c("sample_id", "assay","collection_id","dataset_id"))
+  left_join(large_samples, by = c("sample_", "assay","collection_id","dataset_id"))
 
 sample_to_cell_primary_human_accepted_assay_sample_2 <- 
   sample_to_cell_primary_human_accepted_assay |> 
-  left_join(final_result, by = c("cell_id","sample_id")) |>
+  left_join(final_result, by = c("cell_","sample_")) |>
   # manual adjust 
   mutate(
-    cell_modified = ifelse(dataset_id == "b2dda353-0c96-42df-8dcd-1ea7429a6feb" & sample_id == "5951a81f1d40153bab5d2b808e384f39",
+    cell_modified = ifelse(dataset_id == "b2dda353-0c96-42df-8dcd-1ea7429a6feb" & sample_ == "5951a81f1d40153bab5d2b808e384f39",
                            "s14",
                            cell_modified),
-    cell_modified = ifelse(dataset_id == "b2dda353-0c96-42df-8dcd-1ea7429a6feb" & sample_id == "7313173de022921da50c34ea2f87c7af",
+    cell_modified = ifelse(dataset_id == "b2dda353-0c96-42df-8dcd-1ea7429a6feb" & sample_ == "7313173de022921da50c34ea2f87c7af",
                            "s3",
                            cell_modified)
   ) |>
   mutate(sample_2 = if_else(above_threshold,
-                            paste(sample_id, cell_modified, sep = "___"),
-                            sample_id)
+                            paste(sample_, cell_modified, sep = "___"),
+                            sample_)
   )
 # save result
 #sample_to_cell_primary_human_accepted_assay_sample_2 |> arrow::write_parquet("~/scratch/Census_rerun/sample_to_cell_primary_human_accepted_assay_sample_2_modify.parquet")
+
+gc()
 
 # Load Census census_version = "2024-07-01"
 census <- open_soma(census_version = "stable")
@@ -144,9 +147,9 @@ parquet_file = "~/scratch/Census_rerun/census_samples_to_download.parquet"
 
 census_samples_to_download <- tbl(con, sql(paste0("SELECT * FROM read_parquet('", parquet_file, "')")))
 
-# This is important: please make sure observation_joinid and cell_id is unique per sample (sample_2) in census_samples_to_download
+# This is important: please make sure observation_joinid and cell_ is unique per sample (sample_2) in census_samples_to_download
 census_samples_to_download |> dplyr::count(observation_joinid, sample_2) |> dplyr::count(n)
-census_samples_to_download |> dplyr::count(cell_id, sample_2) |> dplyr::count(n)
+census_samples_to_download |> dplyr::count(cell_, sample_2) |> dplyr::count(n)
 
 
 census_samples_to_download |> group_by(dataset_id, sample_2)  |> 

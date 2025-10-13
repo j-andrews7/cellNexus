@@ -1,7 +1,7 @@
 Type: Package
 Package: cellNexus
 Title: Queries the Human Cell Atlas
-Version: 1.6.12
+Version: 0.99.1
 Authors@R: c(
     person(
         "Stefano",
@@ -11,10 +11,17 @@ Authors@R: c(
         comment = c(ORCID = "0000-0001-7474-836X")
     ),
     person(
+        "Mengyuan",
+        "Shen",
+        email = "shen.m@wehi.edu.au",
+        role = c("aut", "rev", "ctb"),
+        comment = c(ORCID = "0009-0008-0057-8239")
+    ),
+    person(
         "Michael",
         "Milton",
         email = "milton.m@wehi.edu.au",
-        role = c("aut", "rev"),
+        role = c("aut", "rev", "ctb"),
         comment = c(ORCID = "0000-0002-8965-2595")
     ),
     person(
@@ -66,7 +73,8 @@ Description: Provides access to a copy of the Human Cell Atlas, but with
     datasets within the Atlas using common fields such as cell type, tissue 
     type, and patient ethnicity. Usage involves first querying the metadata
     table for cells of interest, and then downloading the corresponding cells 
-    into a SingleCellExperiment object. 
+    into one of several supported formats, including SingleCellExperiment, Seurat,
+    or pseudobulk SummarizedExperiment objects. 
 License: GPL-3
 Depends:
     R (>= 4.2.0)
@@ -87,17 +95,12 @@ Imports:
     Seurat,
     methods,
     rlang,
-    stats,
     S4Vectors,
     tibble,
     utils,
     dbplyr (>= 2.3.0),
     duckdb,
-    stringr,
     checkmate,
-    stringfish,
-    tidySingleCellExperiment,
-    tidybulk,
     shiny,
     shinyWidgets,
     zellkonverter
@@ -114,7 +117,13 @@ Suggests:
     rprojroot,
     openssl,
     scuttle,
-    DelayedArray
+    DelayedArray,
+    tidybulk,
+    BiocParallel,
+    magrittr,
+    preprocessCore,
+    zellkonverter,
+    stringr
 Biarch: true
 biocViews: 
     AssayDomain,

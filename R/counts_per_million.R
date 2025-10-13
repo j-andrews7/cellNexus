@@ -7,12 +7,11 @@
 #' @importFrom SingleCellExperiment SingleCellExperiment
 #' @importFrom SummarizedExperiment assay assays assays<-
 #' @importFrom purrr map
-#' @importFrom zellkonverter writeH5AD
 #' @noRd
 get_counts_per_million <- function(sce, input_file, output_file) {
 
   # Save SCE to the cache directory counts folder
-  sce |> writeH5AD(input_file, compression = "gzip")
+  sce |> zellkonverter::writeH5AD(input_file, compression = "gzip")
   
   # Avoid completely empty cells
   col_sums <- colSums(as.matrix(assay(sce)))
@@ -35,6 +34,6 @@ get_counts_per_million <- function(sce, input_file, output_file) {
   # Check if there is a memory issue 
   assays(sce) <- assays(sce) |> map(DelayedArray::realize)
   
-  sce |> writeH5AD(output_file, compression = "gzip")
+  sce |> zellkonverter::writeH5AD(output_file, compression = "gzip")
 } 
 

@@ -119,10 +119,10 @@ job::job({
   # FOR MENGYUAN CELL_METADATA COULD BE BIGGER THAN CELL_ANNOTATION
   
   get_file_ids(
-    "/vast/scratch/users/shen.m/cellNexus_run/cell_annotation.parquet"
+    "/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/cell_annotation.parquet"
     # "/vast/scratch/users/shen.m/Census_final_run/cell_annotation_new_substitute_cell_type_na_to_unknown_2.parquet"
   )  |> 
-    write_parquet("/vast/scratch/users/shen.m/cellNexus_run/file_id_cellNexus_single_cell.parquet")
+    write_parquet("/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/file_id_cellNexus_single_cell.parquet")
   
   gc()
   
@@ -135,32 +135,25 @@ job::job({
     CONCAT(cell_, '___', dataset_id) AS cell_,
     dataset_id,
     *
-  FROM read_parquet('/vast/scratch/users/shen.m/cellNexus_run/cell_metadata.parquet')
+  FROM read_parquet('/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/cell_metadata.parquet')
 ")
-  
-  # Create views for other tables
-  #   dbExecute(con, "
-  #   CREATE VIEW cell_consensus AS
-  #   SELECT *
-  #   FROM read_parquet('/vast/scratch/users/shen.m/Census_final_run/cell_annotation_new_substitute_cell_type_na_to_unknown_2.parquet')
-  # ")
   
   dbExecute(con, "
   CREATE VIEW cell_annotation AS
   SELECT cell_, blueprint_first_labels_fine, monaco_first_labels_fine, azimuth_predicted_celltype_l2
-  FROM read_parquet('/vast/scratch/users/shen.m/cellNexus_run/annotation_tbl_light.parquet')
+  FROM read_parquet('/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/annotation_tbl_light.parquet')
 ")
   
   dbExecute(con, "
   CREATE VIEW empty_droplet_df AS
   SELECT *
-  FROM read_parquet('/vast/scratch/users/shen.m/cellNexus_run/cell_annotation.parquet')
+  FROM read_parquet('/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/cell_annotation.parquet')
 ")
   
   dbExecute(con, "
   CREATE VIEW file_id_cellNexus_single_cell AS
   SELECT dataset_id, sample_chunk, cell_chunk, sample_pseudobulk_chunk, cell_type_unified_ensemble, sample_id, file_id_cellNexus_single_cell, file_id_cellNexus_pseudobulk
-  FROM read_parquet('/vast/scratch/users/shen.m/cellNexus_run/file_id_cellNexus_single_cell.parquet')
+  FROM read_parquet('/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/file_id_cellNexus_single_cell.parquet')
 ")
   
   #   # This DF is needed to filter out unmatched sample-cell-type combo. Otherwise, cellNexus get_pseudobulk will slice cell names out of bounds.
@@ -196,8 +189,7 @@ job::job({
         
       WHERE cell_metadata.dataset_id NOT IN ('99950e99-2758-41d2-b2c9-643edcdf6d82', '9fcb0b73-c734-40a5-be9c-ace7eea401c9')  -- (THESE TWO DATASETS DOESNT contain meaningful data - no observation_joinid etc), thus was excluded in the final metadata.
         
-  ) TO  '/vast/scratch/users/shen.m/cellNexus_run/test.parquet'
-  -- '/vast/scratch/users/shen.m/cellNexus_run/cell_metadata_cell_type_consensus_v1_0_12_mengyuan.parquet'
+  ) TO  '/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/cell_metadata_cell_type_consensus_v1_0_13_mengyuan.parquet'
   (FORMAT PARQUET, COMPRESSION 'gzip');
 "
   
@@ -215,12 +207,12 @@ job::job({
 cell_metadata = 
   tbl(
     dbConnect(duckdb::duckdb(), dbdir = ":memory:"),
-    sql("SELECT * FROM read_parquet('/vast/scratch/users/shen.m/cellNexus_run/cell_metadata_cell_type_consensus_v1_0_12_mengyuan.parquet')")
+    sql("SELECT * FROM read_parquet('/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/cell_metadata_cell_type_consensus_v1_0_13_mengyuan.parquet')")
   )
 
 library(targets)
 library(tidyverse)
-store_file_cellNexus = "/vast/scratch/users/shen.m/targets_prepare_database_split_datasets_chunked_1_0_12_single_cell"
+store_file_cellNexus = "/vast/scratch/users/shen.m/targets_prepare_database_split_datasets_chunked_1_0_13_single_cell"
 
 tar_script({
   library(dplyr)
@@ -721,13 +713,13 @@ tar_script({
   list(
     
     # The input DO NOT DELETE
-    tar_target(my_store, "/vast/scratch/users/shen.m/Census_final_run/target_store_for_pseudobulk", deployment = "main"),
-    tar_target(cache_directory, "/vast/scratch/users/shen.m/cellNexus/cellxgene/03-06-2025", deployment = "main"),
+    tar_target(my_store, "/vast/scratch/users/shen.m/cellNexus_target_store", deployment = "main"),
+    tar_target(cache_directory, "/vast/scratch/users/shen.m/cellNexus/cellxgene/21-08-2025", deployment = "main"),
     # This is the store for retrieving missing cells between cellnexus metadata and sce. A different store as it was done separately
     #tar_target(cache_directory, "/vast/scratch/users/shen.m/debug2/cellxgene/19-12-2024", deployment = "main"),
     tar_target(
       cell_metadata,
-      "/vast/scratch/users/shen.m/cellNexus_run/cell_metadata_cell_type_consensus_v1_0_12_mengyuan.parquet", 
+      "/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/cell_metadata_cell_type_consensus_v1_0_13_mengyuan.parquet", 
       packages = c( "arrow","dplyr","duckdb")
       
     ),
@@ -842,21 +834,5 @@ missing_cells <- missing_cells_tbl |> pull(cell_id)
 cell_metadata |> filter(!cell_id %in% missing_cells) |> 
   
   # This method of save parquet to parquet is faster 
-  cellNexus:::duckdb_write_parquet(path = "/vast/scratch/users/shen.m/cellNexus_run/cell_metadata_cell_type_consensus_v1_0_12_filtered_missing_cells_mengyuan.parquet")
+  cellNexus:::duckdb_write_parquet(path = "/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/cell_metadata_cell_type_consensus_v1_0_13_filtered_missing_cells_mengyuan.parquet")
 
-
-# Copy files from scratch to vast project
-files_to_copy <- c("annotation_tbl_light.parquet",
-                   "cell_annotation.parquet", "cell_metadata_cell_type_consensus_v1_0_12_mengyuan.parquet",
-                   "cell_metadata_cell_type_consensus_v1_0_12_filtered_missing_cells_mengyuan.parquet",
-                   "cell_metadata.parquet",
-                   "file_id_cellNexus_single_cell.parquet")
-
-source_dir <- "/vast/scratch/users/shen.m/cellNexus_run/"
-destination_dir <- "/vast/projects/cellxgene_curated/metadata_cellxgene_mengyuan/"
-
-# Copy each file
-sapply(files_to_copy, function(file) {
-  file.copy(from = paste0(source_dir, file), 
-            to = paste0(destination_dir, file))
-})

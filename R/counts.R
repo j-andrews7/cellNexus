@@ -24,6 +24,7 @@ COUNTS_URL <- single_line_str(
 #' @inherit get_single_cell_experiment
 #' @inheritDotParams get_single_cell_experiment
 #' @importFrom cli cli_alert_warning
+#' @return A `SingleCellExperiment` object.
 #' @export
 #' @references Mangiola, S., M. Milton, N. Ranathunga, C. S. N. Li-Wai-Suen, 
 #'   A. Odainic, E. Yang, W. Hutchison et al. "A multi-organ map of the human 
@@ -63,6 +64,7 @@ get_SingleCellExperiment <- function(...){
 #'   an HTTP URL pointing to the location where the single cell data is stored.
 #' @param features An optional character vector of features (ie genes) to return
 #'   the counts for. By default counts for all features will be returned.
+#' @return A `SingleCellExperiment` object.
 #' @importFrom dplyr pull filter as_tibble inner_join collect transmute
 #' @importFrom tibble column_to_rownames
 #' @importFrom purrr reduce map map_int imap pmap
@@ -202,6 +204,7 @@ get_single_cell_experiment <- function(data,
 #'   an HTTP URL pointing to the location where the single cell data is stored.
 #' @param features An optional character vector of features (ie genes) to return
 #'   the counts for. By default counts for all features will be returned.
+#' @return A `SummarizedExperiment` object.
 #' @importFrom dplyr pull filter as_tibble inner_join collect transmute
 #' @importFrom tibble column_to_rownames
 #' @importFrom purrr reduce map map_int imap 
@@ -213,10 +216,8 @@ get_single_cell_experiment <- function(data,
 #' @importFrom rlang .data
 #' @importFrom S4Vectors DataFrame
 #' @examples
-#' \dontrun{
-#' meta <- get_metadata() |> filter(tissue_harmonised == "lung")
+#' meta <- get_metadata() |> head(2)
 #' pseudobulk <- meta |> get_pseudobulk()
-#' }
 #' @export
 #' @references Mangiola, S., M. Milton, N. Ranathunga, C. S. N. Li-Wai-Suen, 
 #'   A. Odainic, E. Yang, W. Hutchison et al. "A multi-organ map of the human 
@@ -337,6 +338,7 @@ get_pseudobulk <- function(data,
 #'   an HTTP URL pointing to the location where the single cell data is stored.
 #' @param features An optional character vector of features (ie genes) to return
 #'   the counts for. By default counts for all features will be returned.
+#' @return A `SingleCellExperiment` object.
 #' @importFrom dplyr pull filter as_tibble inner_join collect transmute
 #' @importFrom tibble column_to_rownames
 #' @importFrom purrr reduce map map_int imap 
@@ -348,10 +350,8 @@ get_pseudobulk <- function(data,
 #' @importFrom rlang .data
 #' @importFrom S4Vectors DataFrame
 #' @examples
-#' \dontrun{
-#' meta <- get_metadata() |> filter(tissue_harmonised == "lung")
-#' metacell <- meta |> filter(!is.na(metacell_2)) |> get_metacell(cell_aggregation = "metacell_2")
-#' }
+#' meta <- get_metadata() |> head(2)
+#' metacell <- meta |> get_metacell(cell_aggregation = "metacell_2")
 #' @export
 #' @references Mangiola, S., M. Milton, N. Ranathunga, C. S. N. Li-Wai-Suen, 
 #'   A. Odainic, E. Yang, W. Hutchison et al. "A multi-organ map of the human 
@@ -482,6 +482,8 @@ get_metacell <- function(data,
 #'   an HTTP URL pointing to the location where the single cell data is stored.
 #' @param features An optional character vector of features (ie genes) to return
 #'   the counts for. By default counts for all features will be returned.
+#' @return A list containing validated parameters including data, repository, assays,
+#'   cache_directory, features, cell_aggregation, and atlas_name.
 #' @importFrom dplyr pull filter as_tibble inner_join collect
 #' @importFrom tibble column_to_rownames
 #' @importFrom purrr reduce map map_int imap 
@@ -563,13 +565,11 @@ validate_data <- function(
 #' @param metacell_column A character vector of metacell column (e.g. "metacell_2", "metacell_4") from metadata.
 #' @return A `SummarizedExperiment` object
 #' @importFrom dplyr mutate filter
-#' @importFrom zellkonverter readH5AD
 #' @importFrom SummarizedExperiment colData<-
 #' @importFrom tibble column_to_rownames
 #' @importFrom utils head
 #' @importFrom cli cli_alert_warning cli_abort
 #' @importFrom glue glue
-#' @importFrom stringr str_replace_all
 #' @noRd
 group_to_data_container <- function(i, df, dir_prefix, features, grouping_column,
                                     metacell_column = NULL) {
@@ -593,7 +593,7 @@ group_to_data_container <- function(i, df, dir_prefix, features, grouping_column
     })
   
   # Load experiment
-  experiment <- readH5AD(experiment_path, reader = "R", use_hdf5 = TRUE) |> suppressMessages()
+  experiment <- zellkonverter::readH5AD(experiment_path, reader = "R", use_hdf5 = TRUE) |> suppressMessages()
   
   # Fix for https://github.com/tidyverse/dplyr/issues/6746
   force(i)
@@ -638,8 +638,8 @@ group_to_data_container <- function(i, df, dir_prefix, features, grouping_column
     cell_level_anno <- c("cell_id", "cell_type", "file_id_cellNexus_single_cell",
                          "cell_type_ontology_term_id",
                          "observation_joinid", "ensemble_joinid",
-                         "nFeature_RNA", "data_driven_ensemble", "cell_type_unified",
-                         "empty_droplet", "observation_originalid", "alive", "scDblFinder.class")
+                         "nFeature_expressed_in_sample", "nCount_RNA", "data_driven_ensemble", "cell_type_unified",
+                         "empty_droplet", "observation_originalid", "alive", "scDblFinder.class", "is_immune")
     
     new_coldata <- df |>
       select(-dplyr::all_of(intersect(names(df), cell_level_anno))) |>
@@ -663,8 +663,8 @@ group_to_data_container <- function(i, df, dir_prefix, features, grouping_column
         `colnames<-`(new_coldata$sample_identifier) |>
         `colData<-`(value = DataFrame(new_coldata))
     
-    # Force renaming type class since zellkonverter::writeH5AD cannot save `SummarizedExperiment` object.
-    experiment <- as(experiment, "SingleCellExperiment")
+    # Force renaming type class since zellkonverter::writeH5AD cannot save `SummarizedExperiment` object
+    experiment <- experiment |> as("SingleCellExperiment")
    
   }
   else if (grouping_column == "file_id_cellNexus_metacell") {
